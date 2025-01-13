@@ -1,0 +1,6 @@
+[submodule "coco-caption"]
+	path = coco-caption
+	url = git@github.com:Delphboy/coco-caption.git
+[submodule "cider"]
+	path = cider
+	url = git@github.com:Delphboy/cider.git
