@@ -7,11 +7,14 @@ import os
 import torch
 
 from .SimpleTransformerModel import SimpleTransformerModel
+from .SimpleTransformerFcModel import SimpleTransformerFcModel
 
 def setup(opt):
 
     if opt.caption_model == 'simple_transformer':
         model = SimpleTransformerModel(opt)
+    elif opt.caption_model == 'simple_transformer_fc':
+        model = SimpleTransformerFcModel(opt)
     else:
         raise Exception("Caption model not supported: {}".format(opt.caption_model))
 

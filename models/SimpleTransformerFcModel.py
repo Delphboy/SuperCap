@@ -1,26 +1,7 @@
-##########################################################
-# Copyright 2019 Oath Inc.
-# Licensed under the terms of the MIT license.
-# Please see LICENSE file in the project root for terms.
-##########################################################
-# This file contains Att2in2, AdaAtt, AdaAttMO, TopDown model
-
-# AdaAtt is from Knowing When to Look: Adaptive Attention via A Visual Sentinel for Image Captioning
-# https://arxiv.org/abs/1612.01887
-# AdaAttMO is a modified version with maxout lstm
-
-# Att2in is from Self-critical Sequence Training for Image Captioning
-# https://arxiv.org/abs/1612.00563
-# In this file we only have Att2in2, which is a slightly different version of att2in,
-# in which the img feature embedding and word embedding is the same as what in adaatt.
-
-# TopDown is from Bottom-Up and Top-Down Attention for Image Captioning and VQA
-# https://arxiv.org/abs/1707.07998
-# However, it may not be identical to the author's architecture.
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from typing import List
 
 import torch
 import torch.nn as nn
@@ -246,7 +227,7 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 
-class SimpleTransformerModel(CaptionModel):
+class SimpleTransformerFcModel(CaptionModel):
     def make_model(self, tgt_vocab, N=6,
                    d_model=512, d_ff=2048, h=8, dropout=0.1):
         "Helper: Construct a model from hyperparameters."
@@ -270,7 +251,7 @@ class SimpleTransformerModel(CaptionModel):
         return model
 
     def __init__(self, opt):
-        super(SimpleTransformerModel, self).__init__()
+        super(SimpleTransformerFcModel, self).__init__()
         self.opt = opt
 
         self.vocab_size = opt.vocab_size
@@ -309,7 +290,9 @@ class SimpleTransformerModel(CaptionModel):
         return att_feats, att_masks
 
 
-    def _prepare_feature(self, att_feats, att_masks=None, slots=None, seq=None):
+    def _prepare_feature(self, fc_feats, att_feats, att_masks=None, slots=None, seq=None):
+        if self.opt.use_fc:
+            att_feats = torch.cat([fc_feats.unsqueeze(1), att_feats], dim=1)
 
         att_feats, att_masks = self.clip_att(att_feats, att_masks)
         att_feats = pack_wrapper(self.att_embed, att_feats, att_masks)
@@ -335,8 +318,8 @@ class SimpleTransformerModel(CaptionModel):
         return att_feats,slots, seq, att_masks, seq_mask
 
     def _forward(self, fc_feats, att_feats, slots, seq, att_masks=None):
-        att_feats, slots, seq, att_masks, seq_mask = self._prepare_feature(att_feats, att_masks, slots, seq)
-        out = self.model(att_feats, seq, att_masks, seq_mask, slots)
+        feats, slots, seq, att_masks, seq_mask = self._prepare_feature(fc_feats, att_feats, att_masks, slots, seq)
+        out = self.model(feats, seq, att_masks, seq_mask, slots)
         outputs = self.model.generator(out)
         return outputs
 
@@ -361,7 +344,7 @@ class SimpleTransformerModel(CaptionModel):
         beam_size = opt.get('beam_size', 10)
         batch_size = fc_feats.size(0)
 
-        att_feats, slots, seq, att_masks, _ = self._prepare_feature(att_feats, att_masks, slots)
+        att_feats, slots, seq, att_masks, _ = self._prepare_feature(fc_feats,att_feats, att_masks, slots)
         memory = self.model.encode(att_feats, slots, att_masks)
 
         assert beam_size <= self.vocab_size + 1, 'lets assume this for now, otherwise this corner case causes a few headaches down the road. can be dealt with in future if needed'
@@ -443,7 +426,7 @@ class SimpleTransformerModel(CaptionModel):
 
         batch_size = att_feats.shape[0]
 
-        att_feats, slots, seq, att_masks, _ = self._prepare_feature(att_feats, att_masks, slots)
+        att_feats, slots, seq, att_masks, _ = self._prepare_feature(fc_feats, att_feats, att_masks, slots)
 
         state = None
         memory = self.model.encode(att_feats, slots, att_masks)

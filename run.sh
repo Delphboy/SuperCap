@@ -6,13 +6,14 @@ model_name="test-run"
 checkpoint_location="checkpoints"
 
 python3 train.py --id "${model_name}" \
-	--caption_model "simple_transformer" \
+	--caption_model "simple_transformer_fc" \
 	--input_json "/home/henry/Datasets/coco/cocotalk.json" \
 	--input_fc_dir "/home/henry/Datasets/coco/superpixel_features/CLIP/whole_img/" \
 	--input_att_dir "/home/henry/Datasets/coco/superpixel_features/CLIP/SLIC/m25/" \
 	--input_box_dir "/home/henry/Datasets/coco/butd_box/" \
 	--input_label_h5 "/home/henry/Datasets/coco/cocotalk_label.h5" \
 	--checkpoint_path "${checkpoint_location}" \
+	--use_fc \
 	--fc_feat_size 512 \
 	--att_feat_size 512 \
 	--rnn_size 512 \
@@ -37,13 +38,14 @@ bash scripts/copy_model.sh "${checkpoint_location}" "${model_name}" "${model_nam
 
 # Train SCST
 python train.py --id "${model_name}_rl" \
-	--caption_model "simple_transformer" \
+	--caption_model "simple_transformer_fc" \
 	--input_json "/home/henry/Datasets/coco/cocotalk.json" \
 	--input_fc_dir "/home/henry/Datasets/coco/superpixel_features/CLIP/whole_img/" \
 	--input_att_dir "/home/henry/Datasets/coco/superpixel_features/CLIP/SLIC/m25/" \
 	--input_box_dir "/home/henry/Datasets/coco/butd_box/" \
 	--input_label_h5 "/home/henry/Datasets/coco/cocotalk_label.h5" \
 	--checkpoint_path "${checkpoint_location}" \
+	--use_fc \
 	--fc_feat_size 512 \
 	--att_feat_size 512 \
 	--rnn_size 512 \
