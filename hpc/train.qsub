@@ -28,11 +28,11 @@ checkpoint_location="checkpoints"
 
 python3 train.py --id "${model_name}" \
 	--caption_model "simple_transformer" \
-	--input_json "/home/henry/Datasets/coco/cocotalk.json" \
-	--input_fc_dir "/home/henry/Datasets/coco/superpixel_features/CLIP/whole_img/" \
-	--input_att_dir "/home/henry/Datasets/coco/superpixel_features/CLIP/SLIC/m25/" \
-	--input_box_dir "/home/henry/Datasets/coco/butd_box/" \
-	--input_label_h5 "/home/henry/Datasets/coco/cocotalk_label.h5" \
+	--input_json "/data/EECS-YuanLab/COCO/cocotalk.json" \
+	--input_fc_dir "/data/scratch/eey362/superpixel_features/CLIP/whole_img/" \
+	--input_att_dir "/data/scratch/eey362/superpixel_features/BLIP/SLIC/m25/" \
+	--input_box_dir "/data/EECS-YuanLab/COCO/butd_box/" \
+	--input_label_h5 "/data/EECS-YuanLab/COCO/cocotalk_label.h5" \
 	--checkpoint_path "${checkpoint_location}" \
 	--fc_feat_size 512 \
 	--att_feat_size 512 \
@@ -51,7 +51,7 @@ python3 train.py --id "${model_name}" \
 	--val_images_use 5000 \
 	--max_epochs 30 \
 	--seed -1 \
-	--cached_tokens "/home/henry/Datasets/coco/coco-train-idxs" \
+	--cached_tokens "/data/EECS-YuanLab/COCO/coco-train-idxs" \
 
 # Copy model for SCST
 bash scripts/copy_model.sh "${checkpoint_location}" "${model_name}" "${model_name}_rl"
@@ -59,11 +59,11 @@ bash scripts/copy_model.sh "${checkpoint_location}" "${model_name}" "${model_nam
 # Train SCST
 python train.py --id "${model_name}_rl" \
 	--caption_model "simple_transformer" \
-	--input_json "/home/henry/Datasets/coco/cocotalk.json" \
-	--input_fc_dir "/home/henry/Datasets/coco/superpixel_features/CLIP/whole_img/" \
-	--input_att_dir "/home/henry/Datasets/coco/superpixel_features/CLIP/SLIC/m25/" \
-	--input_box_dir "/home/henry/Datasets/coco/butd_box/" \
-	--input_label_h5 "/home/henry/Datasets/coco/cocotalk_label.h5" \
+	--input_json "/data/EECS-YuanLab/COCO/cocotalk.json" \
+	--input_fc_dir "/data/scratch/eey362/superpixel_features/CLIP/whole_img/" \
+	--input_att_dir "/data/scratch/eey362/superpixel_features/BLIP/SLIC/m25/" \
+	--input_box_dir "/data/EECS-YuanLab/COCO/butd_box/" \
+	--input_label_h5 "/data/EECS-YuanLab/COCO/cocotalk_label.h5" \
 	--checkpoint_path "${checkpoint_location}" \
 	--fc_feat_size 512 \
 	--att_feat_size 512 \
@@ -81,7 +81,7 @@ python train.py --id "${model_name}_rl" \
 	--val_images_use 5000 \
 	--self_critical_after 30 \
 	--max_epochs 60 \
-	--cached_tokens "/home/henry/Datasets/coco/coco-train-idxs" \
+	--cached_tokens "/data/EECS-YuanLab/COCO/coco-train-idxs" \
 
 
 # Eval SCST
@@ -89,11 +89,11 @@ python eval.py --dump_images 0 \
 	--num_images 5000 \
 	--model "${checkpoint_location}/model-${model_name}_rl.pth" \
 	--infos_path "${checkpoint_location}/infos_${model_name}_rl-best.pkl" \
-	--image_root /home/henry/Datasets/coco/img/ \
-	--input_json "/home/henry/Datasets/coco/cocotalk.json" \
-	--input_fc_dir "/home/henry/Datasets/coco/superpixel_features/CLIP/whole_img/" \
-	--input_att_dir "/home/henry/Datasets/coco/superpixel_features/CLIP/SLIC/m25/" \
-	--input_box_dir "/home/henry/Datasets/coco/butd_box/" \
-	--input_label_h5 "/home/henry/Datasets/coco/cocotalk_label.h5" \
+	--image_root /data/EECS-YuanLab/COCO/img/ \
+	--input_json "/data/EECS-YuanLab/COCO/cocotalk.json" \
+	--input_fc_dir "/data/scratch/eey362/superpixel_features/CLIP/whole_img/" \
+	--input_att_dir "/data/scratch/eey362/superpixel_features/BLIP/SLIC/m25/" \
+	--input_box_dir "/data/EECS-YuanLab/COCO/butd_box/" \
+	--input_label_h5 "/data/EECS-YuanLab/COCO/cocotalk_label.h5" \
 	--language_eval 1 \
 
