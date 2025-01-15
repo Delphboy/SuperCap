@@ -30,7 +30,7 @@ python3 train.py --id "${model_name}" \
 	--caption_model "simple_transformer" \
 	--input_json "/data/EECS-YuanLab/COCO/cocotalk.json" \
 	--input_fc_dir "/data/scratch/eey362/superpixel_features/CLIP/whole_img/" \
-	--input_att_dir "/data/scratch/eey362/superpixel_features/BLIP/SLIC/m25/" \
+	--input_att_dir "/data/scratch/eey362/superpixel_features/CLIP/SLIC/m25/" \
 	--input_box_dir "/data/EECS-YuanLab/COCO/butd_box/" \
 	--input_label_h5 "/data/EECS-YuanLab/COCO/cocotalk_label.h5" \
 	--checkpoint_path "${checkpoint_location}" \
@@ -61,7 +61,7 @@ python train.py --id "${model_name}_rl" \
 	--caption_model "simple_transformer" \
 	--input_json "/data/EECS-YuanLab/COCO/cocotalk.json" \
 	--input_fc_dir "/data/scratch/eey362/superpixel_features/CLIP/whole_img/" \
-	--input_att_dir "/data/scratch/eey362/superpixel_features/BLIP/SLIC/m25/" \
+	--input_att_dir "/data/scratch/eey362/superpixel_features/CLIP/SLIC/m25/" \
 	--input_box_dir "/data/EECS-YuanLab/COCO/butd_box/" \
 	--input_label_h5 "/data/EECS-YuanLab/COCO/cocotalk_label.h5" \
 	--checkpoint_path "${checkpoint_location}" \
@@ -92,7 +92,7 @@ python eval.py --dump_images 0 \
 	--image_root /data/EECS-YuanLab/COCO/img/ \
 	--input_json "/data/EECS-YuanLab/COCO/cocotalk.json" \
 	--input_fc_dir "/data/scratch/eey362/superpixel_features/CLIP/whole_img/" \
-	--input_att_dir "/data/scratch/eey362/superpixel_features/BLIP/SLIC/m25/" \
+	--input_att_dir "/data/scratch/eey362/superpixel_features/CLIP/SLIC/m25/" \
 	--input_box_dir "/data/EECS-YuanLab/COCO/butd_box/" \
 	--input_label_h5 "/data/EECS-YuanLab/COCO/cocotalk_label.h5" \
 	--language_eval 1 \
