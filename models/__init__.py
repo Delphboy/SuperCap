@@ -8,6 +8,7 @@ import torch
 
 from .SimpleTransformerModel import SimpleTransformerModel
 from .SimpleTransformerFcModel import SimpleTransformerFcModel
+from .SimpleTransformerFcMultiResModel import SimpleTransformerFcMultiResModel
 
 def setup(opt):
 
@@ -15,6 +16,8 @@ def setup(opt):
         model = SimpleTransformerModel(opt)
     elif opt.caption_model == 'simple_transformer_fc':
         model = SimpleTransformerFcModel(opt)
+    elif opt.caption_model == 'simple_transformer_fc_multi_res':
+        model = SimpleTransformerFcMultiResModel(opt)
     else:
         raise Exception("Caption model not supported: {}".format(opt.caption_model))
 

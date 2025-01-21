@@ -152,7 +152,6 @@ class DataLoader(data.Dataset):
             infos.append(info_dict)
 
         data = {}
-        data['slots'] = {}
         slots_batch, fc_batch, att_batch, label_batch, gts, infos = \
             zip(*sorted(zip(slots_batch, fc_batch, att_batch, np.vsplit(label_batch, batch_size), gts, infos), key=lambda _: 0, reverse=True))
 
@@ -172,6 +171,7 @@ class DataLoader(data.Dataset):
             data['att_masks'] = None
 
         data['labels'] = np.vstack(label_batch)
+
         # generate mask
         nonzeros = np.array(list(map(lambda x: (x != 0).sum()+2, data['labels'])))
         for ix, row in enumerate(mask_batch):
@@ -183,9 +183,25 @@ class DataLoader(data.Dataset):
         data['infos'] = infos
 
         # NOTE: User to define how slot elements are batched
-        # data['slots']['boxes'] = np.zeros([len(slots_batch)*seq_per_img, max_att_len, slots_batch[0]['boxes'].shape[1]], dtype = 'float32')
-        # for i in range(len(slots_batch)):
-        #     data['slots']['boxes'][i*seq_per_img:(i+1)*seq_per_img, :slots_batch[i]['boxes'].shape[0]] = slots_batch[i]['boxes']
+        # Get dimensions
+        slot_keys = list(slots_batch[0].keys())
+        sizes = np.zeros([len(slots_batch), len(slot_keys)])
+        for b, sb in enumerate(slots_batch):
+            sizes[b] = [v.shape[0] for v in sb.values()]
+
+        dim = slots_batch[0][slot_keys[0]].shape[-1]
+
+        # build an empty np.zeros for of that size [B=len(slots_batch), max, D=dim]
+        batched_slot = {}
+        for i, k in enumerate(slot_keys):
+            batched_slot[k] = np.zeros([len(slots_batch) * seq_per_img, int(sizes.max(0)[i]), dim])
+
+        for b, b_element in enumerate(slots_batch):
+            for k in slot_keys:
+                batched_slot[k][b*seq_per_img:(b+1)*seq_per_img, :b_element[k].shape[0], :] = b_element[k]
+
+        data['slots'] = batched_slot
+
         return data
 
     # It's not coherent to make DataLoader a subclass of Dataset, but essentially, we only need to implement the following to functions,
@@ -210,13 +226,24 @@ class DataLoader(data.Dataset):
                 index)
 
     # NOTE: Load slots function
-    def _load_slots(self, ix):
+    def _load_slots(self, index):
         """
         Custom function to load the information required to fill the 'slots' dictionary
         Allowing for extra data to be loaded and given to the model should it be so desired
         returns: dict
         """
         slots = {}
+
+        resolution_dirs = self.opt.extra_resolutions
+        for i, dir in enumerate(resolution_dirs):
+            att_feat = np.load(os.path.join(dir, str(self.info['images'][index]['id']) + '.npz'))['feat']
+            att_feat = att_feat.reshape(-1, att_feat.shape[-1]) # Reshape to K x C
+
+            if self.norm_att_feat:
+                att_feat = att_feat / np.linalg.norm(att_feat, 2, 1, keepdims=True)
+
+            slots[f"extra_resolultion_{i}"] = att_feat
+
         return slots
 
     def __len__(self):

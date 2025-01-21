@@ -121,9 +121,10 @@ def eval_split(model, crit, loader, eval_kwargs={}):
         # forward the model to also get generated samples for each image
         with torch.no_grad():
             # NOTE: Handle how slots are loaded if required
-            slots = data['slots']
-            # boxes_data = slots['boxes'][np.arange(loader.batch_size) * loader.seq_per_img]
-            # slots['boxes'] = boxes_data
+            slots = {}
+            for k in data['slots'].keys():
+                slots[k] = data['slots'][k][np.arange(loader.batch_size) * loader.seq_per_img] if data['slots'] is not None else None
+
             seq = model(fc_feats, att_feats, slots, att_masks, opt=eval_kwargs, mode='sample')[0].data
 
         # Print beam search

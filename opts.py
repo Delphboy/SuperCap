@@ -147,9 +147,9 @@ def parse_opt():
     parser.add_argument("--legacy_extra_skip", type=str2bool, default=False,
                         help=("true only for certain legacy models that have an "
                               "extra skip connection"))
-    #Relative geometry
-    parser.add_argument("--box_trignometric_embedding", type=str2bool,
-                        default=True)
+    # Multiresolution
+    parser.add_argument('--extra_resolutions', action='append',
+                    help='path to the directory containing the preprocessed att feats of additional resolutions')
 
     args = parser.parse_args()
 
