@@ -96,6 +96,7 @@ def train(opt):
                                      'simple_transformer_fc', 
                                      'simple_transformer_fc_multi_res',
                                      'simple_transformer_fc_multi_enc',
+                                     'simple_transformer_moe',
                                      ], 'noampt can only work with transformer models'
         optimizer = utils.get_std_opt(model, factor=opt.noamopt_factor, warmup=opt.noamopt_warmup)
         optimizer._step = iteration
