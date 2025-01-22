@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from copy import deepcopy
 
 import torch
 import torch.nn as nn
@@ -102,11 +103,16 @@ def eval_split(model, crit, loader, eval_kwargs={}):
             fc_feats, att_feats, labels, masks, att_masks = tmp
 
             with torch.no_grad():
-                # NOTE: Send slots to GPU where appropriate
-                slots = data['slots']
-                for k, v in slots.items():
-                    slots[k] = torch.from_numpy(v).cuda() if type(v) is np.ndarray else v
-                loss = crit(model(fc_feats, att_feats, slots, labels, att_masks), labels[:,1:], masks[:,1:]).item()
+                # NOTE: Handle sending slots to GPU
+                slots = data["slots"]
+
+                for i, mask in enumerate(slots['resolutions']):
+                    slots['resolutions'][i] = torch.from_numpy(mask).float().cuda()
+
+                for i, mask in enumerate(slots['masks']):
+                    slots['masks'][i] = torch.from_numpy(mask).float().cuda()
+
+                loss = crit(model(fc_feats, att_feats, deepcopy(slots), labels, att_masks), labels[:,1:], masks[:,1:]).item()
             loss_sum = loss_sum + loss
             loss_evals = loss_evals + 1
 
@@ -122,8 +128,18 @@ def eval_split(model, crit, loader, eval_kwargs={}):
         with torch.no_grad():
             # NOTE: Handle how slots are loaded if required
             slots = {}
-            for k in data['slots'].keys():
-                slots[k] = data['slots'][k][np.arange(loader.batch_size) * loader.seq_per_img] if data['slots'] is not None else None
+            # for k in data['slots'].keys():
+            #     slots[k] = data['slots'][k][np.arange(loader.batch_size) * loader.seq_per_img] if data['slots'] is not None else None
+
+            resolutions = data['slots']['resolutions']
+            for i, mask in enumerate(resolutions):
+                resolutions[i] = mask[np.arange(loader.batch_size) * loader.seq_per_img]
+            slots['resolutions'] = resolutions
+
+            masks = data['slots']['masks']
+            for i, mask in enumerate(masks):
+                masks[i] = mask[np.arange(loader.batch_size) * loader.seq_per_img]
+            slots['masks'] = masks
 
             seq = model(fc_feats, att_feats, slots, att_masks, opt=eval_kwargs, mode='sample')[0].data
 

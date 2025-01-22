@@ -1,8 +1,7 @@
 """
-A simple implementation of multiresolution. The given resoltuion (att_feats) has the additional resolutions concatenated
-onto the tensor. There is also the option to concatenate on the global feature (fc_feats). 
+A multi-encoder implementation of multiresolution.
 
-This model contains a single encoder and a single decoder
+This model contains a one encoder per resolution and a single decoder
 """
 from __future__ import absolute_import
 from __future__ import division
@@ -23,24 +22,38 @@ class EncoderDecoder(nn.Module):
     A standard Encoder-Decoder architecture. Base for this and many
     other models.
     """
-    def __init__(self, encoder, decoder, src_embed, tgt_embed, generator):
+    def __init__(self, encoder, decoder, src_embed, tgt_embed, generator, num_encoders):
         super(EncoderDecoder, self).__init__()
-        self.encoder = encoder
+        self.encoders = nn.ModuleList([copy.deepcopy(encoder) for _ in range(num_encoders)])
         self.decoder = decoder
         self.src_embed = src_embed
         self.tgt_embed = tgt_embed
         self.generator = generator
+        self.num_encoders = num_encoders
 
 
     def forward(self, src, tgt, src_mask, tgt_mask, slots):
         "Take in and process masked src and target sequences."
-        return self.decode(self.encode(src, slots, src_mask), src_mask, tgt, tgt_mask)
+        encoder_output = self.encode(src, slots, src_mask)
+        return self.decode(encoder_output, src_mask, tgt, tgt_mask, slots)
 
     def encode(self, src, slots, src_mask):
-        return self.encoder(self.src_embed(src), slots, src_mask)
+        resolutions = [self.src_embed(src)]
+        [resolutions.append(self.src_embed(v)) for v in slots['resolutions']]
 
-    def decode(self, memory, src_mask, tgt, tgt_mask):
-        return self.decoder(self.tgt_embed(tgt), memory, src_mask, tgt_mask)
+        src_masks = [src_mask]
+        [src_masks.append(m) for m in slots['masks']]
+
+        encoded = [self.encoders[i](resolutions[i], slots, src_masks[i]) for i in range(self.num_encoders)]
+
+        return torch.cat(encoded, dim=1)
+
+
+    def decode(self, memory, src_mask, tgt, tgt_mask, slots={}):
+        src_masks = [src_mask]
+        [src_masks.append(m) for m in slots['masks']]
+        combined_src_mask = torch.cat(src_masks, dim=-1)
+        return self.decoder(self.tgt_embed(tgt), memory, combined_src_mask, tgt_mask)
 
 class Generator(nn.Module):
     "Define standard linear + softmax generation step."
@@ -116,9 +129,9 @@ class Decoder(nn.Module):
         self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
 
-    def forward(self, x, memory, src_mask, tgt_mask):
+    def forward(self, x, memory, src_mask, tgt_mask, slots={}):
         for layer in self.layers:
-            x = layer(x, memory, src_mask, tgt_mask)
+            x = layer(x, memory, src_mask, tgt_mask, slots)
         return self.norm(x)
 
 class DecoderLayer(nn.Module):
@@ -131,7 +144,7 @@ class DecoderLayer(nn.Module):
         self.feed_forward = feed_forward
         self.sublayer = clones(SublayerConnection(size, dropout), 3)
 
-    def forward(self, x, memory, src_mask, tgt_mask):
+    def forward(self, x, memory, src_mask, tgt_mask, slots={}):
         "Follow Figure 1 (right) for connections."
         m = memory
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, tgt_mask))
@@ -235,7 +248,7 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 
-class SimpleTransformerFcMultiResModel(CaptionModel):
+class SimpleTransformerFcMultiEncModel(CaptionModel):
     def make_model(self, tgt_vocab, N=6,
                    d_model=512, d_ff=2048, h=8, dropout=0.1):
         "Helper: Construct a model from hyperparameters."
@@ -243,13 +256,16 @@ class SimpleTransformerFcMultiResModel(CaptionModel):
         attn = MultiHeadedAttention(h, d_model)
         ff = PositionwiseFeedForward(d_model, d_ff, dropout)
         position = PositionalEncoding(d_model, dropout)
+        num_resolutions = 1 + len(self.opt.extra_resolutions)
         model = EncoderDecoder(
             Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout), N),
             Decoder(DecoderLayer(d_model, c(attn), c(attn),
                                  c(ff), dropout), N),
             lambda x:x, # nn.Sequential(Embeddings(d_model, src_vocab), c(position)),
             nn.Sequential(Embeddings(d_model, tgt_vocab), c(position)),
-            Generator(d_model, tgt_vocab))
+            Generator(d_model, tgt_vocab),
+            num_resolutions
+        )
 
         # This was important from their code.
         # Initialize parameters with Glorot / fan_avg.
@@ -259,7 +275,7 @@ class SimpleTransformerFcMultiResModel(CaptionModel):
         return model
 
     def __init__(self, opt):
-        super(SimpleTransformerFcMultiResModel, self).__init__()
+        super(SimpleTransformerFcMultiEncModel, self).__init__()
         self.opt = opt
 
         self.vocab_size = opt.vocab_size
@@ -313,10 +329,6 @@ class SimpleTransformerFcMultiResModel(CaptionModel):
             slots['resolutions'][i] = af
             slots['masks'][i] = am.unsqueeze(-2)
 
-        extra_resolutions = torch.cat([v for v in slots['resolutions']], dim=1)
-        att_feats = torch.cat([att_feats, extra_resolutions], dim=1).float()
-
-        att_masks = torch.where(torch.sum(att_feats, dim=-1) > 0, 1, 0)
 
         if att_masks is None:
             att_masks = att_feats.new_ones(att_feats.shape[:2], dtype=torch.long)
@@ -342,7 +354,7 @@ class SimpleTransformerFcMultiResModel(CaptionModel):
         return outputs
 
 
-    def get_logprobs_state(self, it, memory, mask, state):
+    def get_logprobs_state(self, it, memory, mask, state, slots={}):
         """
         state = [ys.unsqueeze(0)]
         """
@@ -350,10 +362,7 @@ class SimpleTransformerFcMultiResModel(CaptionModel):
             ys = it.unsqueeze(1)
         else:
             ys = torch.cat([state[0][0], it.unsqueeze(1)], dim=1)
-        out = self.model.decode(memory, mask,
-                               ys,
-                               subsequent_mask(ys.size(1))
-                                        .to(memory.device))
+        out = self.model.decode(memory, mask, ys, subsequent_mask(ys.size(1)).to(memory.device), slots)
         logprobs = self.model.generator(out[:, -1])
 
         return logprobs, [ys.unsqueeze(0)]
@@ -380,7 +389,7 @@ class SimpleTransformerFcMultiResModel(CaptionModel):
                 if t == 0: # input <bos>
                     it = fc_feats.new_zeros([beam_size], dtype=torch.long)
 
-                logprobs, state = self.get_logprobs_state(it, tmp_memory, tmp_att_masks, state)
+                logprobs, state = self.get_logprobs_state(it, tmp_memory, tmp_att_masks, state, slots)
 
             self.done_beams[k] = self.beam_search(state, logprobs, tmp_memory, tmp_att_masks, opt=opt)
             seq[:, k] = self.done_beams[k][0]['seq'] # the first beam has highest cumulative score
@@ -458,7 +467,7 @@ class SimpleTransformerFcMultiResModel(CaptionModel):
             if t == 0: # input <bos>
                 it = fc_feats.new_zeros(batch_size, dtype=torch.long)
 
-            logprobs, state = self.get_logprobs_state(it, memory, att_masks, state)
+            logprobs, state = self.get_logprobs_state(it, memory, att_masks, state, slots)
             if decoding_constraint and t > 0:
                 tmp = output.new_zeros(output.size(0), self.vocab_size + 1)
                 tmp.scatter_(1, seq[:,t-1].data.unsqueeze(1), float('-inf'))

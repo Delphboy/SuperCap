@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from copy import deepcopy
 
 import torch
 
@@ -90,7 +91,12 @@ def train(opt):
     rl_crit = utils.RewardCriterion()
 
     if opt.noamopt:
-        assert opt.caption_model in ['transformer', 'simple_transformer', 'simple_transformer_fc', 'simple_transformer_fc_multi_res'], 'noampt can only work with transformer models'
+        assert opt.caption_model in ['transformer', 
+                                     'simple_transformer', 
+                                     'simple_transformer_fc', 
+                                     'simple_transformer_fc_multi_res',
+                                     'simple_transformer_fc_multi_enc',
+                                     ], 'noampt can only work with transformer models'
         optimizer = utils.get_std_opt(model, factor=opt.noamopt_factor, warmup=opt.noamopt_warmup)
         optimizer._step = iteration
     elif opt.reduce_on_plateau:
@@ -140,16 +146,90 @@ def train(opt):
         tmp = [_ if _ is None else torch.from_numpy(_).cuda() for _ in tmp]
         fc_feats, att_feats, labels, masks, att_masks = tmp
         labels = labels.to(torch.int64)
-        slots = None
+
+        # NOTE: Handle sending slots to GPU
         slots = data["slots"]
-        for k, v in slots.items():
-            slots[k] = torch.from_numpy(v).cuda()
+
+        for i, res in enumerate(slots['resolutions']):
+            slots['resolutions'][i] = torch.from_numpy(res).float().cuda()
+
+        for i, mask in enumerate(slots['masks']):
+            slots['masks'][i] = torch.from_numpy(mask).float().cuda()
 
         optimizer.zero_grad()
         reward = 0
 
         if not sc_flag:
-            loss = crit(dp_model(fc_feats, att_feats, slots, labels, att_masks), labels[:,1:], masks[:,1:])
+            loss = crit(dp_model(fc_feats, att_feats, deepcopy(slots), labels, att_masks), labels[:,1:], masks[:,1:])
+        else:
+            gen_result, sample_logprobs = dp_model(fc_feats, att_feats, slots, att_masks, opt={'sample_max':0}, mode='sample')
+            reward = get_self_critical_reward(dp_model, fc_feats, att_feats, slots, att_masks, data, gen_result, opt)
+            loss = rl_crit(sample_logprobs, gen_result.data, torch.from_numpy(reward).float().cuda())
+
+        loss.backward()
+        utils.clip_gradient(optimizer, opt.grad_clip)
+        optimizer.step()
+        train_loss = loss.item()
+        torch.cuda.synchronize()
+        end = time.time()
+        if not sc_flag:
+            logging.info("iter {} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}, CIDEr = {:.3f}" \
+                .format(iteration, epoch, train_loss, end - start, best_val_score))
+        else:
+            logging.info("iter {} (epoch {}), avg_reward = {:.3f}, time/batch = {:.3f}, CIDEr = {:.3f}" \
+                .format(iteration, epoch, np.mean(reward[:,0]), end - start, best_val_score))
+
+        # Update the iteration and epoch
+        iteration += 1
+        if data['bounds']['wrapped']:
+            epoch += 1
+            epoch_done = True
+
+        # Write the training loss summary
+        if (iteration % opt.losses_log_every == 0):
+            if opt.noamopt:
+                opt.current_lr = optimizer.rate()
+            elif opt.reduce_on_plateau:
+                opt.current_lr = optimizer.current_lr
+
+            loss_history[iteration] = train_loss if not sc_flag else np.mean(reward[:,0])
+            lr_history[iteration] = opt.current_lr
+            ss_prob_history[iteration] = model.ss_prob
+
+        # make evaluation on validation set, and save model
+        if (iteration % opt.save_checkpoint_every == 0):
+            # eval model
+            eval_kwargs = {'split': 'val',
+                            'dataset': opt.input_json}
+            eval_kwargs.update(vars(opt))
+            val_loss, predictions, lang_stats = eval_utils.eval_split(dp_model, crit, loader, eval_kwargs)
+
+            if opt.reduce_on_plateau:
+                if 'CIDEr' in lang_stats:
+                    optimizer.scheduler_step(-lang_stats['CIDEr'])
+                else:
+                    optimizer.scheduler_step(val_loss)
+
+            val_result_history[iteration] = {'loss': val_loss, 'lang_stats': lang_stats, 'predictions': predictions}
+
+            # Save model if is improving on validation result
+            if opt.language_eval == 1:
+                current_score = lang_stats['CIDEr']
+            else:
+                current_score = - val_loss
+
+            best_flag = False
+            if True: # if true
+                if best_val_score is None or current_score > best_val_score:
+                    best_val_score = current_score
+                    best_flag = True
+
+        optimizer.zero_grad()
+        reward = 0
+
+
+        if not sc_flag:
+            loss = crit(dp_model(fc_feats, att_feats, deepcopy(slots), labels, att_masks), labels[:,1:], masks[:,1:])
         else:
             gen_result, sample_logprobs = dp_model(fc_feats, att_feats, slots, att_masks, opt={'sample_max':0}, mode='sample')
             reward = get_self_critical_reward(dp_model, fc_feats, att_feats, slots, att_masks, data, gen_result, opt)
