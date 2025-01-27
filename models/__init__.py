@@ -10,6 +10,8 @@ from .SimpleTransformerModel import SimpleTransformerModel
 from .SimpleTransformerFcModel import SimpleTransformerFcModel
 from .SimpleTransformerFcMultiResModel import SimpleTransformerFcMultiResModel
 from .SimpleTransformerFcMultiEncModel import SimpleTransformerFcMultiEncModel
+from .SimpleTransformerFcMoEModel import SimpleTransformerFcMoEModel
+from .SimpleTransformerFcMultiEncMoEModel import SimpleTransformerFcMultiEncMoEModel
 
 def setup(opt):
 
@@ -21,6 +23,10 @@ def setup(opt):
         model = SimpleTransformerFcMultiResModel(opt)
     elif opt.caption_model == 'simple_transformer_fc_multi_enc':
         model = SimpleTransformerFcMultiEncModel(opt)
+    elif opt.caption_model == 'simple_transformer_moe':
+        model = SimpleTransformerFcMoEModel(opt)
+    elif opt.caption_model == 'simple_transformer_multi_enc_moe':
+        model = SimpleTransformerFcMultiEncMoEModel(opt)
     else:
         raise Exception("Caption model not supported: {}".format(opt.caption_model))
 
