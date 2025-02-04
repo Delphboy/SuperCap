@@ -104,13 +104,14 @@ def eval_split(model, crit, loader, eval_kwargs={}):
 
             with torch.no_grad():
                 # NOTE: Handle sending slots to GPU
-                slots = data["slots"]
+                slots = data.get("slots", None)
 
-                for i, mask in enumerate(slots['resolutions']):
-                    slots['resolutions'][i] = torch.from_numpy(mask).float().cuda()
+                if slots is not None:
+                    for i, res in enumerate(slots['resolutions']):
+                        slots['resolutions'][i] = torch.from_numpy(res).float().cuda()
 
-                for i, mask in enumerate(slots['masks']):
-                    slots['masks'][i] = torch.from_numpy(mask).float().cuda()
+                    for i, mask in enumerate(slots['masks']):
+                        slots['masks'][i] = torch.from_numpy(mask).float().cuda()
 
                 loss = crit(model(fc_feats, att_feats, deepcopy(slots), labels, att_masks), labels[:,1:], masks[:,1:]).item()
             loss_sum = loss_sum + loss
@@ -131,19 +132,25 @@ def eval_split(model, crit, loader, eval_kwargs={}):
             # for k in data['slots'].keys():
             #     slots[k] = data['slots'][k][np.arange(loader.batch_size) * loader.seq_per_img] if data['slots'] is not None else None
 
-            resolutions = data['slots']['resolutions']
-            for i, mask in enumerate(resolutions):
-                resolutions[i] = mask[np.arange(loader.batch_size) * loader.seq_per_img]
-            slots['resolutions'] = resolutions
+            if data.get('slots', None):
+                resolutions = data['slots']['resolutions']
+                for i, mask in enumerate(resolutions):
+                    resolutions[i] = mask[np.arange(loader.batch_size) * loader.seq_per_img]
+                slots['resolutions'] = resolutions
 
-            masks = data['slots']['masks']
-            for i, mask in enumerate(masks):
-                masks[i] = mask[np.arange(loader.batch_size) * loader.seq_per_img]
-            slots['masks'] = masks
+                masks = data['slots']['masks']
+                for i, mask in enumerate(masks):
+                    masks[i] = mask[np.arange(loader.batch_size) * loader.seq_per_img]
+                slots['masks'] = masks
 
-            seq = model(fc_feats, att_feats, slots, att_masks, opt=eval_kwargs, mode='sample')[0].data
+                # To the GPU!
+                for i, mask in enumerate(slots['resolutions']):
+                    slots['resolutions'][i] = torch.from_numpy(mask).float().cuda() if type(mask) is not torch.Tensor else mask
 
-        # Print beam search
+                for i, mask in enumerate(slots['masks']):
+                    slots['masks'][i] = torch.from_numpy(mask).float().cuda() if type(mask) is not torch.Tensor else mask
+
+            seq = model(fc_feats, att_feats, deepcopy(slots), att_masks, opt=eval_kwargs, mode='sample')[0].data
         if beam_size > 1 and verbose_beam:
             for i in range(loader.batch_size):
                 print('\n'.join([utils.decode_sequence(loader.get_vocab(), _['seq'].unsqueeze(0))[0] for _ in model.done_beams[i]]))

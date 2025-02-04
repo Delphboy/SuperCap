@@ -21,6 +21,8 @@ from misc.rewards import init_scorer, get_self_critical_reward
 import logging
 logging.basicConfig(level=logging.INFO)
 
+torch.set_float32_matmul_precision('high')
+
 def add_summary_value(writer, key, value, iteration):
     if writer:
         writer.add_scalar(key, value, iteration)
@@ -78,6 +80,10 @@ def train(opt):
         best_val_score = infos.get('best_val_score', None)
 
     model = models.setup(opt).cuda()
+
+    # https://pytorch.org/docs/2.6/torch.compiler_troubleshooting.html#where-to-apply-torch-compile
+    # model = torch.compile(model, 
+    #                       dynamic=True)
     dp_model = torch.nn.DataParallel(model)
 
     epoch_done = True
@@ -149,14 +155,17 @@ def train(opt):
         fc_feats, att_feats, labels, masks, att_masks = tmp
         labels = labels.to(torch.int64)
 
+        slots = {}
         # NOTE: Handle sending slots to GPU
-        slots = data["slots"]
+        # TODO: Magic strings should be pulled out into a single place as constants
+        if opt.caption_model not in ["simple_transformer","simple_transformer_fc"]:
+            slots = data["slots"]
 
-        for i, res in enumerate(slots['resolutions']):
-            slots['resolutions'][i] = torch.from_numpy(res).float().cuda()
+            for i, res in enumerate(slots['resolutions']):
+                slots['resolutions'][i] = torch.from_numpy(res).float().cuda()
 
-        for i, mask in enumerate(slots['masks']):
-            slots['masks'][i] = torch.from_numpy(mask).float().cuda()
+            for i, mask in enumerate(slots['masks']):
+                slots['masks'][i] = torch.from_numpy(mask).float().cuda()
 
         optimizer.zero_grad()
         reward = 0

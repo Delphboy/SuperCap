@@ -184,6 +184,13 @@ class DataLoader(data.Dataset):
 
         # NOTE: User to define how slot elements are batched
 
+
+        # TODO: Magic strings should be pulled out into a single place as constants
+        if self.opt.caption_model in ["simple_transformer","simple_transformer_fc"]:
+            # i.e. not a multiresolution model
+            return data
+
+
         # Get dimensions
         sizes = np.zeros([len(slots_batch), len(slots_batch[0]['resolutions'])])
         for b, sb in enumerate(slots_batch):
@@ -230,7 +237,10 @@ class DataLoader(data.Dataset):
         if self.norm_att_feat:
             att_feat = att_feat / np.linalg.norm(att_feat, 2, 1, keepdims=True)
 
-        slots = self._load_slots(index)
+        slots = {}
+        # TODO: Magic strings should be pulled out into a single place as constants
+        if self.opt.caption_model not in ["simple_transformer","simple_transformer_fc"]:
+            slots = self._load_slots(index)
 
         return (fc_feat,
                 att_feat,
@@ -244,7 +254,6 @@ class DataLoader(data.Dataset):
         Allowing for extra data to be loaded and given to the model should it be so desired
         returns: dict
         """
-        # TODO: Need to calculate the masks here too
         slots = {}
 
         resolution_dirs = self.opt.extra_resolutions

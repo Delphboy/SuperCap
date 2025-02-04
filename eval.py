@@ -104,7 +104,10 @@ parser.add_argument('--verbose_beam', type=int, default=1,
                 help='if we need to print out all beam search beams.')
 parser.add_argument('--verbose_loss', type=int, default=0,
                 help='if we need to calculate loss.')
+
 parser.add_argument('--use_fc', action="store_true", help='Whether to use the fc_feat')
+parser.add_argument('--extra_resolutions', action='append',
+    help='path to the directory containing the preprocessed att feats of additional resolutions')
 
 
 opt = parser.parse_args()
