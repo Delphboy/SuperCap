@@ -216,11 +216,12 @@ class DataLoader(data.Dataset):
             for i, mask in enumerate(masks):
                 mask[b*seq_per_img:(b+1)*seq_per_img, :slot['resolutions'][i].shape[0]] = 1
 
-        for i, mask in enumerate(masks):
-            if mask.sum() == mask.size:
-                masks.__delitem__(i)
+        # for i, mask in enumerate(masks):
+        #     if mask.sum() == mask.size:
+        #         masks.__delitem__(i)
 
         data['slots']['masks'] = masks
+        assert len(batched_resolutions) == len(masks), f"Have {len(batched_resolutions)} resolutions but {len(masks)} masks"
         return data
 
     # It's not coherent to make DataLoader a subclass of Dataset, but essentially, we only need to implement the following to functions,

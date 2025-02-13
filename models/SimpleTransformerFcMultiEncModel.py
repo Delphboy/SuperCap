@@ -323,6 +323,7 @@ class SimpleTransformerFcMultiEncModel(CaptionModel):
         att_feats, att_masks = self.clip_att(att_feats, att_masks)
         att_feats = pack_wrapper(self.att_embed, att_feats, att_masks)
 
+        assert len(slots['resolutions']) == len(slots['masks']), f"Have {len(slots['resolutions'])} resolutions but {len(slots['masks'])} masks"
         for i in range(len(slots['resolutions'])):
             af, am = self.clip_att(slots['resolutions'][i], slots['masks'][i])
             af = pack_wrapper(self.att_embed, af, am)
@@ -391,7 +392,7 @@ class SimpleTransformerFcMultiEncModel(CaptionModel):
 
                 logprobs, state = self.get_logprobs_state(it, tmp_memory, tmp_att_masks, state, slots)
 
-            self.done_beams[k] = self.beam_search(state, logprobs, tmp_memory, tmp_att_masks, opt=opt)
+            self.done_beams[k] = self.beam_search(state, logprobs, tmp_memory, tmp_att_masks, opt=opt, slots=slots)
             seq[:, k] = self.done_beams[k][0]['seq'] # the first beam has highest cumulative score
             seqLogprobs[:, k] = self.done_beams[k][0]['logps']
         # return the samples and their log likelihoods
@@ -418,12 +419,8 @@ class SimpleTransformerFcMultiEncModel(CaptionModel):
         seq = att_feats.new_zeros((batch_size, self.seq_length), dtype=torch.long)
         seqLogprobs = att_feats.new_zeros(batch_size, self.seq_length)
 
-        
         for i in range(self.seq_length):
-            out = self.model.decode(memory, att_masks,
-                               ys,
-                               subsequent_mask(ys.size(1))
-                                        .to(att_feats.device))
+            out = self.model.decode(memory, att_masks, ys, subsequent_mask(ys.size(1)).to(att_feats.device), slots)
             logprob = self.model.generator(out[:, -1])
             if sample_max:
                 sampleLogprobs, next_word = torch.max(logprob, dim = 1)
