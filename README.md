@@ -1,4 +1,4 @@
-# DEFIGNN: Detector-Free Image Captioning with Superpixels and Graph Neural Networks 
+# SuperCap: Multi-resolution Superpixel-based Image Captioning 
 
 ## Setup
 
@@ -6,7 +6,7 @@
 
 Clone the repository and its submodules
 ```bash
-git clone --recurse-submodules -j8 git@github.com:Delphboy/defignn.git
+git clone --recurse-submodules -j8 git@github.com:Delphboy/supercap.git
 cd baseline
 
 # Create directory for eval
