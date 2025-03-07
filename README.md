@@ -6,7 +6,7 @@
 
 Clone the repository and its submodules
 ```bash
-git clone --recurse-submodules -j8 git@github.com:Delphboy/baseline.git
+git clone --recurse-submodules -j8 git@github.com:Delphboy/defignn.git
 cd baseline
 
 # Create directory for eval
